@@ -3,7 +3,7 @@ from models.layers.octaveConv import OctaveConv2D
 
 class Lenet:
     '''
-    A Lenet add batchNorm
+    A Lenet with octaveConv
     '''
     def __init__(self, alpha, x, inputShape, labelSize, dataFormat='channels_last', drawConvImg=False):
         self.drawImages = []
