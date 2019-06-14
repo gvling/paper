@@ -135,19 +135,21 @@ class Resnet18(Network):
 
         return x + inputs
 
-class OctavResnet18(Network):
-    def __init__(self, inputs, labelSize):
+class OctResnet18(Network):
+    def __init__(self, inputs, labelSize, alpha):
         super().__init__(inputs, labelSize)
+        self.alpha = alpha
 
     def inference(self, isTrain):
         self.isTrain = isTrain
         ### pretreatment
         with tf.variable_scope('pretreatment'):
             x = self._pretreatment()
+            low = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='x_low_frequency')(x)
 
         with tf.variable_scope('stage1'):
             with tf.variable_scope('residualBlock1'):
-                s1 = self._residualBlock(x,  64)
+                s1 = self._residualBlock([x, low],  64)
             with tf.variable_scope('residualBlock2'):
                 s1 = self._residualBlock(s1, 64)
 
@@ -169,8 +171,12 @@ class OctavResnet18(Network):
             with tf.variable_scope('residualBlock2'):
                 s4 = self._residualBlock(s4, 512)
 
+        with tf.variable_scope('add'):
+            # TODO: Rewrite with tensorflow
+            add1 = tf.keras.layers.concatenate(s4, name='add1')
+
         with tf.variable_scope('avg_polling'):
-            globalPool = tf.reduce_mean(s4, [1, 2], name='global_average_pooling')
+            globalPool = tf.reduce_mean(add1, [1, 2], name='global_average_pooling')
         with tf.variable_scope('softmax'):
             output = tf.layers.Dense(self.labelSize, activation=tf.nn.softmax, name='softmax')(globalPool)
 
@@ -181,14 +187,19 @@ class OctavResnet18(Network):
         return tf.layers.MaxPooling2D(3, 2)(x)
 
     def _residualBlock(self, inputs, filters, strides=(1,1,1,1)):
-        with tf.variable_scope('conv_1'):
-            x = conv2d(inputs, filters, (3,3), strides=strides ,padding='SAME', batchNorm=True, isTrain=self.isTrain)
-        with tf.variable_scope('conv_2'):
-            x = conv2d(x, filters, (3,3) ,padding='SAME', batchNorm=True, isTrain=self.isTrain)
+        with tf.variable_scope('conv1'):
+            x = octavConv2d(inputs, filters, kernelShape=(3,3), alpha=self.alpha, isTrain=self.isTrain)
+        with tf.variable_scope('conv2'):
+            x = octavConv2d(x, filters, kernelShape=(3,3), alpha=self.alpha, isTrain=self.isTrain)
 
         # deal to dimensions increase
-        if(inputs.get_shape().as_list()[3] != filters):
-            with tf.variable_scope('conv_0'):
-                inputs = conv2d(inputs, filters, (1,1), strides=strides, padding='SAME', batchNorm=True, isTrain=self.isTrain)
+        inputHigh = inputs[0]
+        inputLow = inputs[1]
+        if(inputHigh.get_shape().as_list()[3] != filters):
+            with tf.variable_scope('conv0High'):
+                inputHigh = conv2d(inputHigh, filters, (1,1), strides=strides, padding='SAME', batchNorm=True, isTrain=self.isTrain)
+            with tf.variable_scope('conv0Low'):
+                inputLow = conv2d(inputLow, filters, (1,1), strides=strides, padding='SAME', batchNorm=True, isTrain=self.isTrain)
+                inputs = [inputHigh, inputLow]
 
         return x + inputs
