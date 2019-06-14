@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import re
 
 import tensorflow as tf
 from tensorflow.contrib.tensorboard.plugins import projector
@@ -45,3 +46,11 @@ def projectionImage(images, metadataDir, spriteDir, labels, writer, imgHeight, i
     embedding.sprite.single_image_dim.extend([imgHeight,imgWidth])
     # Saves a config file that TensorBoard will read during startup.
     projector.visualize_embeddings(writer, config)
+
+
+
+def activationSummary(x):
+    tensorName = re.sub('{}_[0-9]*/'.format('tower'), '', x.op.name)
+    tf.summary.histogram(tensorName + '/activations', x)
+    tf.summary.scalar(tensorName + '/sparsity', tf.nn.zero_fraction(x))
+

@@ -1,11 +1,11 @@
 import tensorflow as tf
 
 class Network():
-    def __init__(self, inputs):
+    def __init__(self, inputs, labelSize, dataFormat='channels_last', visualization=False):
         self.inputs = inputs
-
-    def inference(self):
-        return self.output
+        self.labelSize = labelSize
+        self.dataFormat = dataFormat
+        self.visualization = visualization
 
     def loss(self, y):
         with tf.variable_scope('loss'):

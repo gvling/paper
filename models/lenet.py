@@ -1,83 +1,83 @@
 import tensorflow as tf
+from utils.visualization import *
 
-class LeNet5:
-    def __init__(self, imgHeight, imgWidth, channel, labelSize, dataFormat='channels_last'):
-        self.imgSize = imgHeight * imgWidth
-        self.imgHeight = imgHeight
-        self.imgWidth = imgWidth
-        self.imgChannel = channel
-        self.labelSize = labelSize
-        self.inputShape = [-1, imgHeight, imgWidth, channel]
-
-        self.inputs = tf.placeholder(tf.float32, [None, self.imgSize], name='input')
-        #self.outputs = tf.placeholder(tf.float32, [None, labelSize], name='output')
-        self.labels = tf.placeholder(tf.float32, [None, labelSize], name='label')
-
-        # layerの定義
-        self.conv1 = tf.layers.Conv2D(6, 5, data_format=dataFormat, activation=tf.nn.tanh, name='conv1')
-        self.pool1 = tf.layers.AveragePooling2D(2,2,data_format=dataFormat, name='pool1')
-        self.conv2 = tf.layers.Conv2D(16, 5, data_format=dataFormat, activation=tf.nn.tanh, name='conv2')
-        self.pool2 = tf.layers.AveragePooling2D(2,2,data_format=dataFormat, name='pool2')
-        self.flat = tf.layers.Flatten(data_format=dataFormat, name='flat')
-        self.fc1 = tf.layers.Dense(84, activation=tf.nn.tanh, name='fc1')
-        self.fc2 = tf.layers.Dense(10, activation=tf.nn.softmax, name='softmax')
-
-    def forwardPropagation(self):
-        y = tf.reshape(self.inputs, self.inputShape)
-        y = self.conv1(y)
-        y = self.pool1(y)
-        y = self.conv2(y)
-        y = self.pool2(y)
-        y = self.flat(y)
-        y = self.fc1(y)
-        return self.fc2(y)
-
-        #self.outputs = y
-        #return self.outputs
-
-    def coculateLoss(self):
-        with tf.name_scope('crossEntropy'):
-            loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.labels, logits=self.forwardPropagation()))
-        return loss
-
-    def coculateAccuracy(self):
-        correctPrediction = tf.equal(tf.argmax(self.forwardPropagation(), 1), tf.argmax(self.labels, 1))
-        return tf.reduce_mean(tf.cast(correctPrediction, tf.float32))
-
-    def backPropagation(self, lr):
-        res = tf.train.AdamOptimizer(lr).minimize(self.coculateLoss())
-        return res
-
-    def drawTrainHistory(self):
-        with tf.name_scope('train'):
-            tf.summary.scalar('loss', self.coculateLoss())
-            tf.summary.scalar('accuracy', self.coculateAccuracy())
-
-    def drawHistogram(self):
-        tf.summary.histogram('loss', self.coculateLoss())
-        tf.summary.histogram('accuracy', self.coculateAccuracy())
-
-    def drawImage(self):
-        tf.summary.image('train_image', tf.reshape(self.inputs, [-1, self.imgHeight, self.imgWidth, self.imgChannel]), self.labelSize)
+from models.network import Network
+from models.layers.convolution import *
 
 
-    def saveModel(self, modelDir, session):
-        inputs = tf.placeholder(tf.float32, [None, self.imgSize], name='input')
-        outputs = tf.placeholder(tf.float32, [None, self.labelSize], name='output')
 
-        builder = tf.saved_model.builder.SavedModelBuilder(modelDir)
-        builder.add_meta_graph_and_variables(session, ["tag"], signature_def_map={
-                "model": tf.saved_model.signature_def_utils.predict_signature_def(
-                    inputs= {"inputs": inputs},
-                    outputs= {"outputs": outputs})
-                })
-        builder.save()
+class Lenet(Network):
+    def __init__(self, inputs, inputReshapeTo, labelSize, dataFormat='channels_last', batchNorm=False, visualization=False):
+        super().__init__(inputs, labelSize, dataFormat, visualization)
+        self.inputReshapeTo = inputReshapeTo
+        self.batchNorm = batchNorm
 
-    def prediction(self, inputs):
-        self.inputs = inputs
-        return self.forwardPropagation()
+    def inference(self, isTrain):
+        with tf.variable_scope('input'):
+            x = tf.reshape(self.inputs, shape=self.inputReshapeTo)
 
-    def estimation(self, inputs, labels):
-        self.inputs = inputs
-        self.labels= labels
-        return self.coculateAccuracy()
+        with tf.variable_scope('conv_1'):
+            conv1 = conv2d(x, 6, (5,5), padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=isTrain)
+        with tf.variable_scope('pool_1'):
+            pool1 = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool1')(conv1)
+
+        with tf.variable_scope('conv_2'):
+            conv2 = conv2d(pool1, 16, (5,5), padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=isTrain)
+        with tf.variable_scope('pool_2'):
+            pool2 = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool2')(conv2)
+
+        with tf.variable_scope('flat'):
+            flat = tf.layers.Flatten(data_format=self.dataFormat, name='flat')(pool2)
+        with tf.variable_scope('fc'):
+            fc1 = tf.layers.Dense(84, activation=tf.nn.relu, name='fc1')(flat)
+        if(self.visualization):
+            activationSummary(fc1)
+
+        with tf.variable_scope('output'):
+            output = tf.layers.Dense(self.labelSize, activation=tf.nn.softmax, name='softmax')(fc1)
+        if(self.visualization):
+            activationSummary(output)
+
+        self.output = output
+
+class OctLenet(Network):
+    '''
+    A Lenet with octaveConv
+    '''
+    def __init__(self, alpha, inputs, inputReshapeTo, labelSize, dataFormat='channels_last', visualization=False):
+        super().__init__(inputs, labelSize, dataFormat, visualization)
+        self.alpha = alpha
+        self.inputReshapeTo = inputReshapeTo
+
+    def inference(self, isTrain):
+        with tf.variable_scope('input'):
+            x = tf.reshape(self.inputs, shape=self.inputReshapeTo, name='reshape_input')
+            low = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='x_low_frequency')(x)
+
+        with tf.variable_scope('conv_1'):
+            conv1High, conv1Low = octavConv2d([x, low], 6, kernelShape=(5,5), alpha=self.alpha, dataFormat=self.dataFormat, isTrain=isTrain)
+        with tf.variable_scope('pool_1'):
+            pool1High = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool1_high')(conv1High)
+            pool1Low = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool1_low')(conv1Low)
+
+        with tf.variable_scope('conv_2'):
+            conv2High, conv2Low = octavConv2d([pool1High, pool1Low], 16, kernelShape=(5,5), alpha=self.alpha, dataFormat=self.dataFormat, isTrain=isTrain)
+        with tf.variable_scope('pool_2'):
+            pool2High = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool2_high')(conv2High)
+            pool2Low = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool2_low')(conv2Low)
+
+        with tf.variable_scope('flat'):
+            flatHigh = tf.layers.Flatten(data_format=self.dataFormat, name='flat_high')(pool2High)
+            flatLow = tf.layers.Flatten(data_format=self.dataFormat, name='flat_low')(pool2Low)
+
+        with tf.variable_scope('add'):
+            # TODO: Rewrite with tensorflow
+            add1 = tf.keras.layers.concatenate([flatHigh, flatLow], name='add1')
+
+        with tf.variable_scope('fc'):
+            fc1 = tf.layers.Dense(84, activation=tf.nn.relu, name='fc1')(add1)
+
+        with tf.variable_scope('output'):
+            output = tf.layers.Dense(self.labelSize, activation=tf.nn.softmax, name='softmax')(fc1)
+
+        self.output = output
