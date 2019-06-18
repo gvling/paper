@@ -149,25 +149,25 @@ class OctResnet18(Network):
 
         with tf.variable_scope('stage1'):
             with tf.variable_scope('residualBlock1'):
-                s1 = self._residualBlock([x, low],  64)
+                s1 = self._residualBlock((x, low),  64)
             with tf.variable_scope('residualBlock2'):
                 s1 = self._residualBlock(s1, 64)
 
         with tf.variable_scope('stage2'):
             with tf.variable_scope('residualBlock1'):
-                s2 = self._residualBlock(s1, 128, strides=(1,2,2,1))
+                s2 = self._residualBlock(s1, 128, strides=(1,2,2,1), decreaseFeature=True)
             with tf.variable_scope('residualBlock2'):
                 s2 = self._residualBlock(s2, 128)
 
         with tf.variable_scope('stage3'):
             with tf.variable_scope('residualBlock1'):
-                s3 = self._residualBlock(s2, 256, strides=(1,2,2,1))
+                s3 = self._residualBlock(s2, 256, strides=(1,2,2,1), decreaseFeature=True)
             with tf.variable_scope('residualBlock2'):
                 s3 = self._residualBlock(s3, 256)
 
         with tf.variable_scope('stage4'):
             with tf.variable_scope('residualBlock1'):
-                s4 = self._residualBlock(s3, 512, strides=(1,2,2,1))
+                s4 = self._residualBlock(s3, 512, strides=(1,2,2,1), decreaseFeature=True)
             with tf.variable_scope('residualBlock2'):
                 s4 = self._residualBlock(s4, 512)
 
@@ -184,22 +184,20 @@ class OctResnet18(Network):
 
     def _pretreatment(self):
         x = conv2d(self.inputs, 64, (7,7), strides=(1,2,2,1), padding='SAME', batchNorm=True, isTrain=self.isTrain)
-        return tf.layers.MaxPooling2D(3, 2)(x)
+        return tf.layers.MaxPooling2D(2, 2)(x)
 
-    def _residualBlock(self, inputs, filters, strides=(1,1,1,1)):
+    def _residualBlock(self, inputs, filters, strides=(1,1,1,1), decreaseFeature=False):
         with tf.variable_scope('conv1'):
-            x = octavConv2d(inputs, filters, kernelShape=(3,3), alpha=self.alpha, isTrain=self.isTrain)
+            x = octaveConv2d(inputs, filters, kernelShape=(3,3), strides=strides, alpha=self.alpha, isTrain=self.isTrain)
         with tf.variable_scope('conv2'):
-            x = octavConv2d(x, filters, kernelShape=(3,3), alpha=self.alpha, isTrain=self.isTrain)
+            x = octaveConv2d(x, filters, kernelShape=(3,3), alpha=self.alpha, isTrain=self.isTrain)
 
         # deal to dimensions increase
         inputHigh = inputs[0]
         inputLow = inputs[1]
-        if(inputHigh.get_shape().as_list()[3] != filters):
-            with tf.variable_scope('conv0High'):
-                inputHigh = conv2d(inputHigh, filters, (1,1), strides=strides, padding='SAME', batchNorm=True, isTrain=self.isTrain)
-            with tf.variable_scope('conv0Low'):
-                inputLow = conv2d(inputLow, filters, (1,1), strides=strides, padding='SAME', batchNorm=True, isTrain=self.isTrain)
-                inputs = [inputHigh, inputLow]
+        if(inputHigh.get_shape().as_list()[3]+inputLow.get_shape().as_list()[3] != filters):
+            inputHigh, inputLow = octaveConv2d(inputs, filters, (1,1), strides=strides, isTrain=self.isTrain)
+            inputs = (inputHigh, inputLow)
 
-        return x + inputs
+        print(x[0].shape, x[1].shape, inputs[0].shape, inputs[1].shape)
+        return (x[0]+inputs[0], x[1]+inputs[1])

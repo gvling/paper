@@ -16,19 +16,19 @@ def conv2d(inputs, filters, kernelShape, isTrain, strides=(1,1,1,1), padding='VA
     weightShape = (kernelShape[0], kernelShape[1], inputShape[-1], filters)
     weightSize = kernelShape[0] * kernelShape[1] * inputShape[-1] * filters
     W = getRandomInitVariable(weightShape, 'W')
+    if(visualization):
+        drawHistogram('kernel', W)
 
     # conv -> bn -> act
+    logit = tf.nn.conv2d(inputs, W, strides=strides, padding=padding)
     if(batchNorm):
-        logit = batchNormalization(
-                tf.nn.conv2d(inputs, W, strides=strides, padding=padding),
-                filters,
-                isTrain)
+        logit = batchNormalization(logit, filters, isTrain, visualization=visualization)
     # conv -> +b -> act
     else:
         b = getConstInitVariable(filters, 'b')
-        logit = tf.nn.bias_add(
-                tf.nn.conv2d(inputs, W, strides=strides, padding=padding),
-                b)
+        if(visualization):
+            drawHistogram('bias', b)
+        logit = tf.nn.bias_add(logit, b)
 
     if(activation == 'relu'):
         logit = tf.nn.relu(logit)
@@ -37,11 +37,10 @@ def conv2d(inputs, filters, kernelShape, isTrain, strides=(1,1,1,1), padding='VA
         pass
 
     if(visualization):
-        activationSummary(logit)
-
+        drawHistogram('activation', logit)
     return logit
 
-def octavConv2d(inputs, filters, kernelShape, isTrain, alpha=0.25, strides=(1,1,1,1), padding='SAME',
+def octaveConv2d(inputs, filters, kernelShape, isTrain, alpha=0.25, strides=(1,1,1,1), padding='SAME',
         dataFormat='channels_last', activation='relu', visualization=True):
     '''
     inputs: [highFrequencyInput, lowFrequencyInput]
@@ -79,6 +78,7 @@ def octavConv2d(inputs, filters, kernelShape, isTrain, alpha=0.25, strides=(1,1,
     # coculate logits
     with tf.variable_scope('highToHighFrequencyConv'):
         high2HighLogit = tf.nn.conv2d(highInput, highW, strides=strides, padding=padding)
+        highFmapShape = high2HighLogit.get_shape().as_list()
 
     ## high to low down sampling
     with tf.variable_scope('highToLowFrequencyConv'):
@@ -86,7 +86,7 @@ def octavConv2d(inputs, filters, kernelShape, isTrain, alpha=0.25, strides=(1,1,
 
     ## low to high up sampling
     with tf.variable_scope('lowToHighFrequencyConv'):
-        low2HighLogit = upSampling(tf.nn.conv2d(lowInput, low2HighW, strides=strides, padding=padding))
+        low2HighLogit = upSampling(tf.nn.conv2d(lowInput, low2HighW, strides=strides, padding=padding), highFmapShape)
 
     with tf.variable_scope('lowToLowFrequencyConv'):
         low2LowLogit = tf.nn.conv2d(lowInput, lowW, strides=strides, padding=padding)

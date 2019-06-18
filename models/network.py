@@ -1,8 +1,8 @@
 import tensorflow as tf
 
 class Network():
-    def __init__(self, inputs, labelSize, dataFormat='channels_last', visualization=False):
-        self.inputs = inputs
+    def __init__(self, inputs, labelSize, dataFormat='channels_last', visualization=False, rescaleTo=1/255.):
+        self.inputs = tf.scalar_mul(tf.convert_to_tensor(rescaleTo, dtype=tf.float32), inputs)
         self.labelSize = labelSize
         self.dataFormat = dataFormat
         self.visualization = visualization
