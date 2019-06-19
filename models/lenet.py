@@ -5,6 +5,40 @@ from models.network import Network
 from models.layers.convolution import *
 
 
+class LenetKeras(Network):
+    def __init__(self, inputs, inputReshapeTo, labelSize, dataFormat='channels_last', batchNorm=False, visualization=False):
+        super().__init__(inputs, labelSize, dataFormat, visualization)
+        self.inputReshapeTo = inputReshapeTo
+        self.batchNorm = batchNorm
+
+    def inference(self, isTrain):
+        with tf.variable_scope('input'):
+            x = tf.reshape(self.inputs, shape=self.inputReshapeTo)
+        with tf.variable_scope('conv_1'):
+            conv1 = tf.keras.layers.Conv2D(6, (5,5), padding='same')(x)
+            if(self.batchNorm):
+                conv1 = tf.keras.layers.BatchNormalization()(conv1)
+            conv1 = tf.keras.layers.Activation('relu')(conv1)
+        with tf.variable_scope('pool_1'):
+            pool1 = tf.keras.layers.MaxPooling2D(2, 2, name='pool1')(conv1)
+
+        with tf.variable_scope('conv_2'):
+            conv2 = tf.keras.layers.Conv2D(16, (5,5), padding='same')(pool1)
+            if(self.batchNorm):
+                conv2 = tf.keras.layers.BatchNormalization()(conv2)
+            conv2 = tf.keras.layers.Activation('relu')(conv2)
+        with tf.variable_scope('pool_2'):
+            pool2 = tf.keras.layers.MaxPooling2D(2, 2, name='pool2')(conv2)
+
+        with tf.variable_scope('flat'):
+            flat = tf.keras.layers.Flatten(name='flat')(pool2)
+        with tf.variable_scope('fc'):
+            fc1 = tf.keras.layers.Dense(84, activation=tf.nn.relu, name='fc1')(flat)
+
+        with tf.variable_scope('output'):
+            output = tf.keras.layers.Dense(self.labelSize, activation='softmax', name='softmax')(fc1)
+        self.output = output
+
 class LenetTF(Network):
     def __init__(self, inputs, inputReshapeTo, labelSize, dataFormat='channels_last', batchNorm=False, visualization=False):
         super().__init__(inputs, labelSize, dataFormat, visualization)
@@ -18,7 +52,7 @@ class LenetTF(Network):
         with tf.variable_scope('conv_1'):
             conv1 = tf.layers.Conv2D( 6, (5,5), padding='same', kernel_initializer=tf.initializers.random_normal())(x)
             if(self.batchNorm):
-                conv1 = tf.layers.BatchNormalization()(conv1)
+                conv1 = tf.layers.batch_normalization(conv1, training=isTrain)
             conv1 = tf.nn.relu(conv1)
         with tf.variable_scope('pool_1'):
             pool1 = tf.layers.MaxPooling2D(2,2,data_format=self.dataFormat, name='pool1')(conv1)
@@ -26,7 +60,7 @@ class LenetTF(Network):
         with tf.variable_scope('conv_2'):
             conv2 = tf.layers.Conv2D(16, (5,5), padding='same', kernel_initializer=tf.initializers.random_normal())(pool1)
             if(self.batchNorm):
-                conv2 = tf.layers.BatchNormalization()(conv2)
+                conv2 = tf.layers.batch_normalization(conv2, training=isTrain)
             conv2 = tf.nn.relu(conv2)
         with tf.variable_scope('pool_2'):
             pool2 = tf.layers.MaxPooling2D(2,2,data_format=self.dataFormat, name='pool2')(conv2)

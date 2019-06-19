@@ -6,6 +6,7 @@ class Network():
         self.labelSize = labelSize
         self.dataFormat = dataFormat
         self.visualization = visualization
+        self.output = None
 
     def loss(self, y):
         with tf.variable_scope('loss'):
