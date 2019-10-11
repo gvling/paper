@@ -41,7 +41,7 @@ def conv2d(inputs, filters, kernelShape, isTrain, strides=(1,1,1,1), padding='VA
     return logit
 
 def octaveConv2d(inputs, filters, kernelShape, isTrain, alpha=0.25, strides=(1,1,1,1), padding='SAME',
-        dataFormat='channels_last', activation='relu', visualization=True):
+        dataFormat='channels_last', activation='relu', batchNorm=False, visualization=True):
     '''
     inputs: [highFrequencyInput, lowFrequencyInput]
     alpha: [0, 1], Ratio of low-frequency filters.
@@ -75,6 +75,12 @@ def octaveConv2d(inputs, filters, kernelShape, isTrain, alpha=0.25, strides=(1,1
     low2HighWeightShape = (*kernelShape, lowInputShape[-1], highFilters)
     low2HighW = getRandomInitVariable(low2HighWeightShape, 'W_low_to_high')
 
+    if(visualization):
+        drawHistogram('kernel_high_to_high', highW)
+        drawHistogram('kernel_high_to_low', high2LowW)
+        drawHistogram('kernel_low_to_high', low2HighW)
+        drawHistogram('kernel_low_to_low', lowW)
+
     # coculate logits
     with tf.variable_scope('highToHighFrequencyConv'):
         high2HighLogit = tf.nn.conv2d(highInput, highW, strides=strides, padding=padding)
@@ -95,10 +101,20 @@ def octaveConv2d(inputs, filters, kernelShape, isTrain, alpha=0.25, strides=(1,1
     lowLogit = low2LowLogit + high2LowLogit
 
     # batch normalization
-    with tf.variable_scope('highFrequencyBN'):
-        highLogit =  batchNormalization(highLogit, highFilters, isTrain)
-    with tf.variable_scope('lowFrequencyBN'):
-        lowLogit =  batchNormalization(lowLogit, lowFilters, isTrain)
+    if(batchNorm):
+        with tf.variable_scope('highFrequencyBN'):
+            highLogit =  batchNormalization(highLogit, highFilters, isTrain, visualization=visualization)
+        with tf.variable_scope('lowFrequencyBN'):
+            lowLogit =  batchNormalization(lowLogit, lowFilters, isTrain, visualization=visualization)
+    else:
+        # TODO bias dimintion 6
+        highB = getConstInitVariable(highFilters, 'b_high')
+        lowB = getConstInitVariable(lowFilters, 'b_low')
+        if(visualization):
+            drawHistogram('bias_high', highB)
+            drawHistogram('bias_low', lowB)
+        highLogit = tf.nn.bias_add(highLogit, highB)
+        lowLogit = tf.nn.bias_add(lowLogit, lowB)
 
     if(activation == 'relu'):
          highLogit = tf.nn.relu(highLogit)
@@ -108,6 +124,7 @@ def octaveConv2d(inputs, filters, kernelShape, isTrain, alpha=0.25, strides=(1,1
         pass
 
     if(visualization):
-        activationSummary(highLogit)
-        activationSummary(lowLogit)
+        drawHistogram('activation_high', highLogit)
+        drawHistogram('activation_low', lowLogit)
+
     return highLogit, lowLogit

@@ -55,7 +55,7 @@ class LenetTF(Network):
                 conv1 = tf.layers.batch_normalization(conv1, training=isTrain)
             conv1 = tf.nn.relu(conv1)
         with tf.variable_scope('pool_1'):
-            pool1 = tf.layers.MaxPooling2D(2,2,data_format=self.dataFormat, name='pool1')(conv1)
+            pool1 = tf.layers.MaxPooling2D(2, 2, name='pool1')(conv1)
 
         with tf.variable_scope('conv_2'):
             conv2 = tf.layers.Conv2D(16, (5,5), padding='same', kernel_initializer=tf.initializers.random_normal())(pool1)
@@ -63,7 +63,7 @@ class LenetTF(Network):
                 conv2 = tf.layers.batch_normalization(conv2, training=isTrain)
             conv2 = tf.nn.relu(conv2)
         with tf.variable_scope('pool_2'):
-            pool2 = tf.layers.MaxPooling2D(2,2,data_format=self.dataFormat, name='pool2')(conv2)
+            pool2 = tf.layers.MaxPooling2D(2, 2, name='pool2')(conv2)
 
         with tf.variable_scope('flat'):
             flat = tf.layers.Flatten(data_format=self.dataFormat, name='flat')(pool2)
@@ -109,10 +109,11 @@ class OctLenet(Network):
     '''
     A Lenet with octaveConv
     '''
-    def __init__(self, alpha, inputs, inputReshapeTo, labelSize, dataFormat='channels_last', visualization=False):
+    def __init__(self, alpha, inputs, inputReshapeTo, labelSize, dataFormat='channels_last', batchNorm=False, visualization=False):
         super().__init__(inputs, labelSize, dataFormat, visualization)
         self.alpha = alpha
         self.inputReshapeTo = inputReshapeTo
+        self.batchNorm = batchNorm
 
     def inference(self, isTrain):
         with tf.variable_scope('input'):
@@ -120,16 +121,16 @@ class OctLenet(Network):
             low = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='x_low_frequency')(x)
 
         with tf.variable_scope('conv_1'):
-            conv1High, conv1Low = octaveConv2d([x, low], 6, kernelShape=(5,5), alpha=self.alpha, dataFormat=self.dataFormat, isTrain=isTrain)
+            conv1High, conv1Low = octaveConv2d([x, low], 6, kernelShape=(5,5), alpha=self.alpha, batchNorm=self.batchNorm, visualization=self.visualization, isTrain=isTrain)
         with tf.variable_scope('pool_1'):
-            pool1High = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool1_high')(conv1High)
-            pool1Low = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool1_low')(conv1Low)
+            pool1High = tf.layers.MaxPooling2D(2,2,data_format=self.dataFormat, name='pool1_high')(conv1High)
+            pool1Low = tf.layers.MaxPooling2D(2,2,data_format=self.dataFormat, name='pool1_low')(conv1Low)
 
         with tf.variable_scope('conv_2'):
-            conv2High, conv2Low = octaveConv2d([pool1High, pool1Low], 16, kernelShape=(5,5), alpha=self.alpha, dataFormat=self.dataFormat, isTrain=isTrain)
+            conv2High, conv2Low = octaveConv2d([pool1High, pool1Low], 16, kernelShape=(5,5), alpha=self.alpha, batchNorm=self.batchNorm, visualization=self.visualization, isTrain=isTrain)
         with tf.variable_scope('pool_2'):
-            pool2High = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool2_high')(conv2High)
-            pool2Low = tf.layers.AveragePooling2D(2,2,data_format=self.dataFormat, name='pool2_low')(conv2Low)
+            pool2High = tf.layers.MaxPooling2D(2,2,data_format=self.dataFormat, name='pool2_high')(conv2High)
+            pool2Low = tf.layers.MaxPooling2D(2,2,data_format=self.dataFormat, name='pool2_low')(conv2Low)
 
         with tf.variable_scope('flat'):
             flatHigh = tf.layers.Flatten(data_format=self.dataFormat, name='flat_high')(pool2High)

@@ -4,12 +4,15 @@ from models.layers.convolution import *
 
 
 class Resnet50(Network):
-    def __init__(self, inputs, labelSize):
-        super().__init__(inputs, labelSize)
+    def __init__(self, inputs, labelSize, dataFormat='channels_last', batchNorm=False, visualization=False):
+        super().__init__(inputs, labelSize, dataFormat, visualization)
+        self.batchNorm = batchNorm
 
         ### pretreatment
+    def inference(self, isTrain):
+        self.isTrain = isTrain
         with tf.variable_scope('pretreatment'):
-            x = self._pretreatment()
+            x = self._pretreatment(isTrain)
 
         with tf.variable_scope('stage1'):
             with tf.variable_scope('residualBlock1'):
@@ -59,27 +62,28 @@ class Resnet50(Network):
         self.output = output
 
     def _pretreatment(self):
-        x = conv2d(self.inputs, 64, (7,7), strides=(1,2,2,1), padding='SAME', batchNormalization=True)
+        x = conv2d(self.inputs, 64, (7,7), strides=(1,2,2,1), padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=self.isTrain)
         return tf.layers.MaxPooling2D(3, 2)(x)
 
     def _residualBlock(self, inputs, filters, strides=(1,1,1,1)):
         with tf.variable_scope('conv_1'):
-            x = conv2d(inputs, filters, (1,1), strides=strides ,padding='SAME', batchNormalization=True)
+            x = conv2d(inputs, filters, (1,1), strides=strides ,padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=self.isTrain)
         with tf.variable_scope('conv_2'):
-            x = conv2d(x, filters, (3,3) ,padding='SAME', batchNormalization=True)
+            x = conv2d(x, filters, (3,3) ,padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=isTrain)
         with tf.variable_scope('conv_3'):
-            x = conv2d(x, filters*4, (1,1) ,padding='SAME', batchNormalization=True)
+            x = conv2d(x, filters*4, (1,1) ,padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=isTrain)
 
         # deal to dimensions increase
         if(inputs.get_shape().as_list()[3] != filters*4):
             with tf.variable_scope('conv_0'):
-                inputs = conv2d(inputs, filters*4, (1,1), strides=strides, padding='SAME', batchNormalization=True)
+                inputs = conv2d(inputs, filters*4, (1,1), strides=strides, padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=isTrain)
 
         return x + inputs
 
 class Resnet18(Network):
-    def __init__(self, inputs, labelSize):
-        super().__init__(inputs, labelSize)
+    def __init__(self, inputs, labelSize, dataFormat='channels_last', batchNorm=False, visualization=False):
+        super().__init__(inputs, labelSize, dataFormat, visualization)
+        self.batchNorm = batchNorm
 
     def inference(self, isTrain):
         self.isTrain = isTrain
@@ -111,7 +115,7 @@ class Resnet18(Network):
             with tf.variable_scope('residualBlock2'):
                 s4 = self._residualBlock(s4, 512)
 
-        with tf.variable_scope('avg_polling'):
+        with tf.variable_scope('global_avg_polling'):
             globalPool = tf.reduce_mean(s4, [1, 2], name='global_average_pooling')
         with tf.variable_scope('softmax'):
             output = tf.layers.Dense(self.labelSize, activation=tf.nn.softmax, name='softmax')(globalPool)
@@ -119,25 +123,26 @@ class Resnet18(Network):
         self.output = output
 
     def _pretreatment(self):
-        x = conv2d(self.inputs, 64, (7,7), strides=(1,2,2,1), padding='SAME', batchNorm=True, isTrain=self.isTrain)
+        x = conv2d(self.inputs, 64, (7,7), strides=(1,2,2,1), padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=self.isTrain)
         return tf.layers.MaxPooling2D(3, 2)(x)
 
     def _residualBlock(self, inputs, filters, strides=(1,1,1,1)):
         with tf.variable_scope('conv_1'):
-            x = conv2d(inputs, filters, (3,3), strides=strides ,padding='SAME', batchNorm=True, isTrain=self.isTrain)
+            x = conv2d(inputs, filters, (3,3), strides=strides ,padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=self.isTrain)
         with tf.variable_scope('conv_2'):
-            x = conv2d(x, filters, (3,3) ,padding='SAME', batchNorm=True, isTrain=self.isTrain)
+            x = conv2d(x, filters, (3,3) ,padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=self.isTrain)
 
         # deal to dimensions increase
         if(inputs.get_shape().as_list()[3] != filters):
             with tf.variable_scope('conv_0'):
-                inputs = conv2d(inputs, filters, (1,1), strides=strides, padding='SAME', batchNorm=True, isTrain=self.isTrain)
+                inputs = conv2d(inputs, filters, (1,1), strides=strides, padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=self.isTrain)
 
         return x + inputs
 
 class OctResnet18(Network):
-    def __init__(self, inputs, labelSize, alpha):
-        super().__init__(inputs, labelSize)
+    def __init__(self, alpha, inputs, labelSize, dataFormat='channels_last', batchNorm=False, visualization=False):
+        super().__init__(inputs, labelSize, dataFormat, visualization)
+        self.batchNorm = batchNorm
         self.alpha = alpha
 
     def inference(self, isTrain):
@@ -183,14 +188,14 @@ class OctResnet18(Network):
         self.output = output
 
     def _pretreatment(self):
-        x = conv2d(self.inputs, 64, (7,7), strides=(1,2,2,1), padding='SAME', batchNorm=True, isTrain=self.isTrain)
+        x = conv2d(self.inputs, 64, (7,7), strides=(1,2,2,1), padding='SAME', batchNorm=self.batchNorm, visualization=self.visualization, isTrain=self.isTrain)
         return tf.layers.MaxPooling2D(2, 2)(x)
 
     def _residualBlock(self, inputs, filters, strides=(1,1,1,1), decreaseFeature=False):
         with tf.variable_scope('conv1'):
-            x = octaveConv2d(inputs, filters, kernelShape=(3,3), strides=strides, alpha=self.alpha, isTrain=self.isTrain)
+            x = octaveConv2d(inputs, filters, kernelShape=(3,3), strides=strides, alpha=self.alpha, batchNorm=self.batchNorm, visualization=self.visualization, isTrain=self.isTrain)
         with tf.variable_scope('conv2'):
-            x = octaveConv2d(x, filters, kernelShape=(3,3), alpha=self.alpha, isTrain=self.isTrain)
+            x = octaveConv2d(x, filters, kernelShape=(3,3), alpha=self.alpha, batchNorm=self.batchNorm, visualization=self.visualization, isTrain=self.isTrain)
 
         # deal to dimensions increase
         inputHigh = inputs[0]
