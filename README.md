@@ -1,12 +1,12 @@
 # docker
-image: tensorflow/tensorflow:1.12.0-gpu-py3
-tfboard: tensorboard --logdir ./paper/logs/
+image: tensorflow/tensorflow:1.12.0-gpu-py3<br>
+tfboard: tensorboard --logdir ./paper/logs/<br>
 
 # jupyterExtensions
-pip install jupyter_contrib_nbextensions
-jupyter contrib nbextension install --user
-jupyter nbextension enable codefolding/main
-jupyter contrib nbextensions migrate
+pip install jupyter_contrib_nbextensions<br>
+jupyter contrib nbextension install --user<br>
+jupyter nbextension enable codefolding/main<br>
+jupyter contrib nbextensions migrate<br>
 
 
 # paper
