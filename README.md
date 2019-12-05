@@ -2,7 +2,7 @@
 image: tensorflow/tensorflow:1.12.0-gpu-py3<br>
 tfboard: tensorboard --logdir ./paper/logs/<br>
 ```
-$ nvidia-docker run -it --name paper -e PASSWORD=your-password -e http_prox=http-proxy -e https_proxy=https-proxy -v path-to-pj:/notebooks -p host-port:8888 -p host-port:6006 tensorflow/tensorflow:1.12.0-gpu-py3
+$ nvidia-docker run -itd --name paper -e PASSWORD=your-password -e http_prox=http-proxy -e https_proxy=https-proxy -v path-to-pj:/notebooks -p host-port:8888 -p host-port:6006 tensorflow/tensorflow:1.12.0-gpu-py3
 ```
 
 
